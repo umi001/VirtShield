@@ -110,7 +110,7 @@ Creating virtual machine requires iso (optical disc image) of the operating syst
 <!-- Creating bridge network for VMs-->
 - ### Create two TAP, tap-client and tap-server
     ```
-    sudo brctl addrbr br0
+    sudo brctl addbr br0
     sudo ip addr add 192.168.10.1/24 dev br0
     sudo ip link set dev br0 up
     ```
@@ -213,6 +213,172 @@ After creating the VMs, the devices needs to be given network configurations to 
         ```
         sudo netplan apply
         ```
+
+
+
+## ✅ Troubleshooting Internet Access in QEMU/KVM VMs (firewalld + NAT)
+
+If your VM **can ping internal devices but cannot access the internet**, the issue may lie with `firewalld` silently blocking forwarding or NAT.
+
+---
+
+### 🛠️ Symptoms
+
+* VM can ping gateway (e.g., 192.168.10.1) but cannot reach `8.8.8.8`
+* On host, `tcpdump` shows ICMP requests from VM leaving `br0`, but not leaving `eno1`(interface)
+* No entries in `conntrack`
+* ICMP unreachable messages with "admin prohibited"
+
+---
+
+### 🔍 Step-by-Step Fix (Using firewalld)
+
+#### 1. Check if firewalld is running
+
+```bash
+sudo firewall-cmd --state
+```
+
+If `running`, continue. If not, your issue is elsewhere.
+
+#### 2. Assign the VM bridge interface (`br0`) to a firewalld zone
+
+```bash
+sudo firewall-cmd --permanent --zone=trusted --add-interface=br0
+sudo firewall-cmd --reload
+```
+
+Verify:
+
+```bash
+sudo firewall-cmd --get-active-zones
+```
+
+You should see `br0` listed under `trusted`.
+
+#### 3. Enable masquerading for the `trusted` zone
+
+```bash
+sudo firewall-cmd --zone=trusted --permanent --add-masquerade
+sudo firewall-cmd --reload
+```
+
+#### 4. Ensure IP forwarding is enabled
+
+```bash
+sudo sysctl -w net.ipv4.ip_forward=1
+```
+
+
+<!-- Make permanent via `/etc/sysctl.conf`:
+
+```ini
+net.ipv4.ip_forward = 1
+``` -->
+
+#### 5. Verify NAT rule was applied
+
+```bash
+sudo nft list chain inet firewalld nat_POST_trusted_allow
+```
+
+Look for:
+
+```nft
+oifname "eno1" masquerade
+```
+
+#### 6. Test from VM
+
+```bash
+ping 1.1.1.1
+```
+
+Check from host:
+
+```bash
+sudo tcpdump -i eno1 icmp
+```
+
+If you see packets leaving with the host's IP → ✅ NAT is working.
+
+---
+
+<!-- ### 💾 Backup Script (Re-apply configuration)
+
+```bash
+#!/bin/bash
+
+# Assign br0 to trusted zone
+firewall-cmd --permanent --zone=trusted --add-interface=br0
+
+# Enable masquerading for trusted zone
+firewall-cmd --zone=trusted --permanent --add-masquerade
+
+# Reload firewall
+firewall-cmd --reload
+
+# Ensure IP forwarding is enabled
+sysctl -w net.ipv4.ip_forward=1
+
+# Optional: Make forwarding persistent
+if ! grep -q '^net.ipv4.ip_forward=1' /etc/sysctl.conf; then
+    echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+fi
+```
+
+Make executable:
+
+```bash
+chmod +x fix-vm-networking.sh
+```
+
+Run anytime:
+
+```bash
+sudo ./fix-vm-networking.sh
+```
+
+---
+
+### 📌 Include in your README:
+
+> #### If your VM has no internet access:
+>
+> * Check if the VM’s bridge (`br0`) is managed by firewalld:
+>
+>   ```bash
+>   sudo firewall-cmd --get-active-zones
+>   ```
+> * If `br0` is missing or unmanaged:
+>
+>   * Assign it to a zone (e.g., `trusted`)
+>   * Enable masquerade in that zone
+>   * Ensure IP forwarding is enabled
+>   * See the detailed fix in `fix-vm-networking.sh`.
+>
+> These steps are firewalld-safe and do not require disabling the firewall.
+ -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     Perform the similar operations on all VMs. These configuration can be applied during the creation of VM. 
 
