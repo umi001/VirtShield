@@ -62,7 +62,7 @@ Each script launches its VM with proper MAC, disk, and ISO. During the initial b
 | Model  | 52:54:00:12:34:02 | 192.168.10.3 | Security Model Host |
 | Server | 52:54:00:12:34:03 | 192.168.10.5 | Receiver            |
 
-To set static IP addresses inside each VM, configure **netplan** as below. At this stage you may need to type the following code directly into each VM console, since the VMs do not yet have an IP address to allow remote connection. The interface name may be `ens3` as shown. You can confirm the correct name by running `ip link` inside the VM; look for the primary network interface (commonly ens3 in QEMU).; adjust if your VM presents a different device name:
+To set static IP addresses inside each VM, configure **netplan** as below. At this stage, you may need to type the following code directly into each VM console, since the VMs do not yet have an IP address to allow remote connection. The interface name may be `ens3` as shown. You can confirm the correct name by running `ip link` inside the VM; look for the primary network interface (commonly ens3 in QEMU).; adjust if your VM presents a different device name:
 
 #### 5.1 On `client` VM
 
@@ -142,7 +142,9 @@ sudo netplan apply
 
 > These static configurations ensure each VM is reachable at the fixed IPs shown in the table above.
 
-###
+
+###<img width="3729" height="1092" alt="VirtShield" src="https://github.com/user-attachments/assets/7cb7eeeb-5e97-46fc-a4e5-26ac3e9f9950" />
+
 
 ### 4. Transfer Setup Scripts
 
@@ -191,11 +193,11 @@ sudo netplan apply
   cd ~/VirtShield
   make
   ```
-  Builds `kernel_space.ko` and `user_space_model`.
+  Builds `kernel_space.ko` and `user_space_model[packet_sniffer]`.
 - Run:
   ```bash
   sudo insmod kernel_space.ko     # kernel-space
-  ./user_space_model              # user-space
+  ./user_space_model              # user-space [packet_sniffer]
   ```
 - Unload kernel module:
   ```bash
@@ -214,8 +216,9 @@ sudo netplan apply
   sudo ./run_perf.sh <logdir> <mode>
   # mode: 0 = user-space, 1 = kernel-space
   ```
-
-### 8. Logs and Debugging
+### 8. Manually running the benchmarks 
+The `Benchmarks` folder contains the scripts to run each benchmark manually. Users are encouraged to add additional benchmarks. The `Results` and `Results_Summary` contain results and logs for our runs of firewall and Suricata.
+### 9. Logs and Debugging
 
 | Component       | Command/File                             |   |
 | --------------- | ---------------------------------------- | - |
@@ -224,7 +227,7 @@ sudo netplan apply
 | Perf outputs    | `perf_kernel.log`, `perf_user_space.log` |   |
 | Perf raw data   | `perf_kernel.data` + `perf report`       |   |
 
-### 9. Troubleshooting: No Internet in VMs
+### 10. Troubleshooting: No Internet in VMs
 
 If VMs can ping `192.168.10.1` but not the internet, first check whether this is caused by `firewalld` blocking forwarding rules. You can check with:
 
@@ -282,7 +285,7 @@ cd setup
 
 ### 2. Modify and Deploy Security Model
 
-Once the containers are up and required files are copied in, the user is expected to:
+Once the containers are up and the required files are copied in, the user is expected to:
 
 - Navigate to `/root/performance/workspace/` inside the model container
 - Modify the required C source files to implement their own security logic
@@ -295,7 +298,7 @@ cd /root/performance/workspace
 make
 ```
 
-This produces `kernel_space.ko` and `user_space_model`.
+This produces `kernel_space.ko` and `user_space_model[packet_sniffer]`.
 
 Run:
 
